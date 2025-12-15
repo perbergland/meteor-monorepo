@@ -13,6 +13,9 @@ import { TsCheckerRspackPlugin } from "ts-checker-rspack-plugin";
  */
 export default defineConfig((/* Meteor */) => {
   return {
+    resolve: {
+      symlinks: false,
+    },
     plugins: [new TsCheckerRspackPlugin()],
   };
 });
