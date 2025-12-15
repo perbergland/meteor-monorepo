@@ -1,5 +1,6 @@
 import { Meteor } from 'meteor/meteor';
 import { Link, LinksCollection } from '/imports/api/links';
+import { myMethod } from './shared-file';
 
 async function insertLink({ title, url }: Pick<Link, 'title' | 'url'>) {
   await LinksCollection.insertAsync({ title, url, createdAt: new Date() });
@@ -35,3 +36,7 @@ Meteor.startup(async () => {
     return LinksCollection.find();
   });
 });
+
+Meteor.startup(async () => {
+  console.log(`My method = ${myMethod()}`)
+})
