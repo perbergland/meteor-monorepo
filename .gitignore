@@ -1,3 +1,4 @@
 typescript-rspack/tsconfig.tsbuildinfo
 README.md
 rspack-repro/node_modules/
+rspack-repro/dist/
