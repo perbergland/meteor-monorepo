@@ -87,12 +87,39 @@ Without `baseUrl`, SWC doesn't create its internal resolver, so no `canonicalize
 - [PR #6716](https://github.com/swc-project/swc/pull/6716) - Attempted fix, reverted because it broke Bazel
 - [Issue #8265](https://github.com/swc-project/swc/issues/8265) - Bazel issue that added `canonicalize()` back
 
-## Fix
+## Workaround (Meteor)
+
+Override `jsc.baseUrl` to an empty string in your `rspack.config.ts`:
+
+```typescript
+import { defineConfig } from "@meteorjs/rspack";
+
+export default defineConfig((Meteor) => {
+  return {
+    resolve: {
+      symlinks: false,
+    },
+    // Workaround: Set jsc.baseUrl to empty string to prevent SWC from
+    // canonicalizing symlinks (which breaks resolve.symlinks: false)
+    ...Meteor.extendSwcConfig({
+      jsc: {
+        baseUrl: "",
+      },
+    }),
+  };
+});
+```
+
+This works because when `baseUrl` is empty, SWC skips creating its `NodeImportResolver` entirely, so no `canonicalize()` is called.
+
+**Caveat**: This disables SWC's path alias resolution (`paths` from tsconfig.json). If you need path aliases, this workaround won't work.
+
+## Proper Fix
 
 The fix needs to be in SWC or `@meteorjs/rspack`:
 
 1. **SWC**: Add a `preserveSymlinks` option to `NodeImportResolver` that skips `canonicalize()` when true
-2. **@meteorjs/rspack**: Don't set `jsc.baseUrl` if not needed for path aliases
+2. **@meteorjs/rspack**: Don't set `jsc.baseUrl` by default if not needed for path aliases
 3. **@meteorjs/rspack**: File a bug with SWC about the interaction between `baseUrl` and symlinks
 
 ## File Structure
