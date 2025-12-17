@@ -53,11 +53,47 @@ npm run start
 | `rspack-with-baseurl.config.js` | set to `__dirname` | ❌ Fails |
 | Meteor's config | set to project dir | ❌ Fails |
 
+## Root Cause Analysis (SWC Source Code)
+
+The bug is in SWC's module transform code:
+
+**File**: [`swc_ecma_transforms_module/src/path.rs`](https://github.com/swc-project/swc/blob/main/crates/swc_ecma_transforms_module/src/path.rs) (lines 270-277)
+
+```rust
+// Bazel uses symlink
+// https://github.com/swc-project/swc/issues/8265
+if let FileName::Real(resolved) = &target.filename {
+    if let Ok(orig) = canonicalize(resolved) {
+        target.filename = FileName::Real(orig);
+    }
+}
+```
+
+### What happens:
+
+1. **Rspack resolves correctly**: With `resolve.symlinks: false`, rspack's resolver returns the symlink path without calling `realpath()`.
+
+2. **SWC creates a resolver when `baseUrl` is set**: In [`swc/src/config/mod.rs`](https://github.com/swc-project/swc/blob/main/crates/swc/src/config/mod.rs), `get_resolver()` only creates a `NodeImportResolver` when `baseUrl` or `paths` are configured.
+
+3. **SWC unconditionally calls `canonicalize()`**: When SWC's resolver processes an import, it calls `canonicalize()` which resolves symlinks to their real paths - defeating rspack's `symlinks: false` setting.
+
+### Why it only happens with `baseUrl`:
+
+Without `baseUrl`, SWC doesn't create its internal resolver, so no `canonicalize()` is called. The symlink path passes through unchanged.
+
+### Historical context:
+
+- [Issue #4057](https://github.com/swc-project/swc/issues/4057) - "Import statements improperly transformed when using symlinks"
+- [PR #6716](https://github.com/swc-project/swc/pull/6716) - Attempted fix, reverted because it broke Bazel
+- [Issue #8265](https://github.com/swc-project/swc/issues/8265) - Bazel issue that added `canonicalize()` back
+
 ## Fix
 
-The fix needs to be in `@meteorjs/rspack` - either:
-1. Don't set `jsc.baseUrl` in the SWC loader config
-2. Or file a bug with rspack about the interaction between `jsc.baseUrl` and `resolve.symlinks`
+The fix needs to be in SWC or `@meteorjs/rspack`:
+
+1. **SWC**: Add a `preserveSymlinks` option to `NodeImportResolver` that skips `canonicalize()` when true
+2. **@meteorjs/rspack**: Don't set `jsc.baseUrl` if not needed for path aliases
+3. **@meteorjs/rspack**: File a bug with SWC about the interaction between `baseUrl` and symlinks
 
 ## File Structure
 
@@ -78,3 +114,7 @@ meteor-monorepo/
 │   └── rspack-with-baseurl.config.js  # Fails (has baseUrl)
 └── README.md
 ```
+
+---
+
+*Root cause analysis performed by [Claude Code](https://claude.ai/claude-code) (Claude Opus 4.5) by reading and tracing through the rspack and SWC source code on GitHub.*
