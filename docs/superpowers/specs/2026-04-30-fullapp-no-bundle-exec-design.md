@@ -27,12 +27,18 @@ Out of scope for this session: dropping in the private repo's custom `rspack.con
 ## Target state for the repro run
 
 1. `typescript-rspack/.meteor/release` → `METEOR@3.4.1`
-2. `typescript-rspack/package.json` devDeps:
+2. `typescript-rspack/package.json` devDeps (from `ref-app/refapp#5565` `backgroundcheck/package.json`):
    - `@meteorjs/rspack`: `2.0.1` (pinned, not caret)
-   - `@rspack/core`, `@rspack/cli`, `@swc/core`, `@swc/helpers` aligned to what `@meteorjs/rspack@2.0.1` peer-depends on
+   - `@rspack/core`: `1.7.11`
+   - `@rspack/cli`: `1.7.11`
+   - `@rspack/plugin-react-refresh`: `1.4.3`
+   - `@swc/core`: `^1.15.24`
+   - `@swc/helpers`: `0.5.17` (already present, drop the caret)
+   - (skip `@rsdoctor/rspack-plugin` for now — not load-bearing for the repro)
 3. `@meteorjs/rspack@2.0.1`'s `lib/test.js` patched per the diff in the handoff doc, applied via `patch-package` (npm-native; no yarn conversion).
 4. `server/main.ts` opens with `console.log("[diag] main.ts top-level @ " + Date.now());`
 5. `server/x.app-tests.ts` exists with a top-level `console.log` and a single `it()` smoke test (chai-based).
+6. `meteor.testModule` removed from `package.json` — match the private repo's config exactly.
 
 ## Decisions
 
@@ -65,6 +71,6 @@ meteor test --full-app --once --driver-package meteortesting:mocha --port 3015  
 
 ## Risks / open questions
 
-- The exact peer versions for `@meteorjs/rspack@2.0.1` need to be looked up via `npm view @meteorjs/rspack@2.0.1 peerDependencies` before step 2. The handoff says "see private repo's `backgroundcheck/package.json` for a pinned set" but we don't have access to that here, so we'll resolve via `npm view`.
-- `patch-package` against a transitive dep of `@meteorjs/meteor` (auto-installed by the rspack build plugin) may be re-clobbered by the auto-installer the way the handoff warns about for yarn. If that happens, we may need to also pin `@meteorjs/rspack` in a `resolutions`-equivalent (npm `overrides`) block. Will address if observed.
-- The handoff describes a `.meteor/local/build/` cache invalidation issue. If the run produces unexpected output, verifying that `.meteor/local/build/programs/server/app/app.js` actually contains the test code is part of triage.
+- **Auto-installer clobber.** The rspack build plugin's `DEFAULT_METEOR_RSPACK_VERSION` is what triggered the private repo to ship `scripts/verify-meteor-rspack-patch.mjs` as a guard. Pinning to `2.0.1` (the version the auto-installer wants) avoids the reinstall, but `patch-package`'s `postinstall` hook needs to run *after* any reinstall the rspack plugin performs at meteor-startup time. If we observe the patch reverted between installs and `meteor test --full-app` runs, port the verify script over and wire it into a `pretest` hook.
+- **Cache invalidation.** The handoff describes stale `.meteor/local/build/programs/server/app/app.js` surviving a Meteor release bump. If the repro produces unexpected output, dumping that file's first 200 bytes is part of triage before changing anything else.
+- **`testModule` not set.** The current `package.json` has `meteor.testModule: "tests/main.ts"`. The private repo's `backgroundcheck/package.json` does NOT set `meteor.testModule` — only `meteor.mainModule`. The handoff calls out a separate suspected bug where `testModule` is silently ignored under rspack. Removing `testModule` here keeps the repro aligned with the private repo's config; will do that in step 4.
