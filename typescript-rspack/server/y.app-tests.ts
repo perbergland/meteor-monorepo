@@ -1,9 +1,9 @@
 console.log("[diag] y.app-tests.ts top-level @ " + Date.now());
 import { expect } from "chai";
-import { D_VAL } from "/imports/sym/async-d";
+import { wrapped } from "/imports/sym/wrapper";
 
 describe("smoke y", () => {
-  it("runs too", () => {
-    expect(D_VAL).to.equal("D:E");
+  it("also uses wrapped (transitive TLA via wrapper)", () => {
+    expect(wrapped).to.equal("wrapped(tla-shared)");
   });
 });
