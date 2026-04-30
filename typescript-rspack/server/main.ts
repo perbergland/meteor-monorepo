@@ -1,3 +1,6 @@
+import tracer from 'dd-trace';
+tracer.init();
+
 console.log("[diag] main.ts top-level @ " + Date.now());
 await Promise.resolve();
 
