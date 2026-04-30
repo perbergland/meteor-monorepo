@@ -4,8 +4,10 @@ await Promise.resolve();
 import { Meteor } from 'meteor/meteor';
 import { Link, LinksCollection } from '/imports/api/links';
 import { symGreet } from '/imports/sym/sym-util';
+import { A_VAL } from '/imports/sym/async-a';
 
 console.log("[diag] symGreet() = " + symGreet());
+console.log("[diag] A_VAL = " + A_VAL);
 
 async function insertLink({ title, url }: Pick<Link, 'title' | 'url'>) {
   await LinksCollection.insertAsync({ title, url, createdAt: new Date() });
