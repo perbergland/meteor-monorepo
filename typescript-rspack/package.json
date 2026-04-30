@@ -22,11 +22,13 @@
     "@rspack/core": "1.7.11",
     "@rspack/plugin-react-refresh": "1.4.3",
     "@swc/core": "^1.15.24",
+    "@types/chai": "^5.2.3",
     "@types/meteor": "^2.9.9",
     "@types/mocha": "^8.2.3",
     "@types/node": "^22.10.6",
     "@types/react": "^18.2.5",
     "@types/react-dom": "^18.2.4",
+    "chai": "^6.2.2",
     "patch-package": "^8.0.1",
     "react-refresh": "^0.17.0",
     "ts-checker-rspack-plugin": "^1.1.5",
@@ -40,7 +42,6 @@
       "client": "client/main.tsx",
       "server": "server/main.ts"
     },
-    "testModule": "tests/main.ts",
     "modern": true
   }
 }

@@ -1,3 +1,5 @@
+console.log("[diag] main.ts top-level @ " + Date.now());
+
 import { Meteor } from 'meteor/meteor';
 import { Link, LinksCollection } from '/imports/api/links';
 
