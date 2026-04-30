@@ -1,3 +1,6 @@
+console.log("[diag] tests/main.ts top-level @ " + Date.now());
+await Promise.resolve();
+
 import { Meteor } from 'meteor/meteor';
 import assert from 'assert';
 
