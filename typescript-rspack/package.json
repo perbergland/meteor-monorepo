@@ -5,7 +5,8 @@
     "start": "meteor run",
     "test": "meteor test --once --driver-package meteortesting:mocha",
     "test-app": "TEST_WATCH=1 meteor test --full-app --driver-package meteortesting:mocha",
-    "visualize": "meteor --production --extra-packages bundle-visualizer"
+    "visualize": "meteor --production --extra-packages bundle-visualizer",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@babel/runtime": "^7.23.5",
@@ -26,6 +27,7 @@
     "@types/node": "^22.10.6",
     "@types/react": "^18.2.5",
     "@types/react-dom": "^18.2.4",
+    "patch-package": "^8.0.1",
     "react-refresh": "^0.17.0",
     "ts-checker-rspack-plugin": "^1.1.5",
     "typescript": "^5.9.3"
