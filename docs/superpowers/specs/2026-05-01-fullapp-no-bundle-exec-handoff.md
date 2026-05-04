@@ -169,6 +169,33 @@ the `@meteorjs/rspack` npm package.
    wording into the new issue body without checking what the code actually calls. Per caught it,
    I patched it. Lesson: when in doubt, `grep` the source rather than the comment thread.
 
+## Experiment 2026-05-01 — `meteor.testModule.server` is NOT a per-project workaround
+
+**Hypothesis:** would setting `meteor.testModule.server = "server/testmain.ts"` (where `testmain.ts`
+explicitly imports the test files) trigger a different code path that avoids the bridge bug?
+
+**Result:** **No.** Same `0 passing (0ms)` outcome, same `AFTER-IMPORT - TOP ≈ 0ms` shape. The bug
+is structural at the bridge layer.
+
+What confirmed it: with `meteor.testModule.server` set, the auto-generated test entry file
+(`_build/test/server-entry.js`) does change — it now imports `'../../server/testmain.ts'` instead
+of being empty, and the misleading "is empty" banner is replaced by "Defined under
+`meteor.testModule.server`". So the rspack plugin DOES recognize the nested-object form.
+
+But the bridge file (`_build/test/server-meteor.js`) is byte-identical to the eager-mode version —
+still `import './server-rspack.js'`. And in the bundle, `_build/test/server-entry.js` is wrapped
+with `__webpack_require__.a` (because `testmain.ts` has transitively async deps), so the bundle's
+tail is the same `var __webpack_exports__ = __webpack_require__("./_build/test/server-entry.js");
+module.exports = __webpack_exports__;` shape — `module.exports` is still a Promise. The bridge
+still drops it.
+
+**Take-away for #14395 if maintainers ask "can users work around this with testModule?":** no,
+the bug is at the rspack ↔ reify bridge layer, which is independent of whether the user uses
+eager test discovery or an explicit `testModule` entry. Fix B is the only fix.
+
+Files for the experiment are committed on the branch (see commit immediately preceding this
+handoff update); revert if not useful for the upstream PR.
+
 ## Plumbing I left intact (verify on arrival)
 
 - `~/.meteor/packages/core-runtime/.../os/load-js-image.js` — restored to original (verified
