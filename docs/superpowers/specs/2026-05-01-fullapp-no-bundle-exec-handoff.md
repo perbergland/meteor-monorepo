@@ -10,22 +10,28 @@ This file is the intended starting point for a new session or contributor pickin
 
 - **Diagnosed end-to-end.** The bundle-not-executed bug under `meteor test` is reliably
   reproducible on a clean public fork. Both the trigger and the fix are tracked in code references.
-- **Verified two-line fix.** With both upstream changes applied (Fix A + Fix B below), the slow-TLA
-  repro flips from `0 passing` to `2 passing` under both `meteor test` and `meteor test --full-app`.
-- **Public branch:** `perbergland/meteor-monorepo@chore/fullapp-repro`, tip
-  [`eaf2fe2`](https://github.com/perbergland/meteor-monorepo/commit/eaf2fe2). Each variant is a
-  separate commit; checkpoints inspectable via `git checkout <sha>`.
+- **Verified upstream fix.** With both upstream changes applied (Fix A + Fix B below), the
+  slow-TLA repro flips from `0 passing` to `2 passing` under both `meteor test` and
+  `meteor test --full-app`. Fix A is a small (~3-line) patch to `@meteorjs/rspack/lib/test.js`;
+  Fix B is a multi-piece change in the meteor `rspack` package — `detectAsyncBundle` runtime
+  detection, a `bundleHasAsync` flag plumbed through the file configs, a guard in the
+  `ensureModuleFilesExist` loop to avoid clobbering rspack's bundle output, a server-only
+  ternary in the bridge codegen, and a post-compile hook that re-emits the bridge once the
+  bundle has been written.
+- **Public branch:** `perbergland/meteor-monorepo@chore/fullapp-repro`. Each variant is a
+  separate commit; checkpoints inspectable via `git checkout <sha>`. Tip is the verbatim
+  PR-source state.
 - **Upstream issues:**
   - [meteor#14371](https://github.com/meteor/meteor/issues/14371) — eager-loader patch
     (`forEach(ctx)` → `await Promise.all(... .map(ctx))`). Still open. **This is Fix A.**
   - [meteor#14392](https://github.com/meteor/meteor/issues/14392) — closed (framing was wrong;
     boot.js's synchronous evaluation is not the gate).
   - [meteor#14395](https://github.com/meteor/meteor/issues/14395) — bridge file doesn't await the
-    bundle's Promise. **This is Fix B**, the new issue replacing #14392.
-- **No upstream PR yet.** Fix B's two-line change lives in the meteor `rspack` package source, not
-  in the `@meteorjs/rspack` npm package, so it can't be applied via project-level patch-package.
-  Open question for the next session: open a PR against `meteor/meteor`'s `packages/rspack/...`
-  source.
+    bundle's Promise. **This is what Fix B addresses.**
+  - [meteor#14396](https://github.com/meteor/meteor/pull/14396) — Per's PR with the bridge fix
+    plus async-bundle detection so non-TLA bundles aren't penalised. Currently includes both
+    follow-up fixes from the review of this branch (correct rspack detection signal; loop
+    guard against clobbering rspack's bundle).
 
 ## Reproduction (broken state on the branch)
 
@@ -110,8 +116,11 @@ the `@meteorjs/rspack` npm package.
 ## What I'd do next
 
 1. **Open a PR** against `meteor/meteor`'s `packages/rspack/...` source with Fix B. Reference
-   issue #14395 in the PR description. The change is the `import * as` / `await Promise.resolve`
-   two-line replacement at the codegen template.
+   issue #14395 in the PR description. The minimum change is the `import * as` / `await
+   Promise.resolve` codegen replacement; the version that landed in PR #14396 wraps that in an
+   `isServer && bundleHasAsync` gate (so non-TLA bundles don't pay the await microtask) and adds
+   a `detectAsyncBundle` runtime check + post-compile bridge refresh. Several coordinated
+   pieces, not just the codegen line.
 2. **Watch for review feedback.** Likely concerns from maintainers:
    - Does the `Promise.resolve(...)` wrap correctly handle non-TLA bundles? (Answer: yes — the
      namespace's `default` is whatever `module.exports` was, which for non-TLA CJS-output is
@@ -260,8 +269,9 @@ modes:
  2 passing
 ```
 
-Both fixes are tiny — one literal-string change and one length-guard. They should land on the PR
-before merge.
+Both fixes are tiny — one literal-string change and one length-guard. Both **landed on PR #14396
+head `588e3c92`**; the verbatim PR source now passes 2/2 on this repro without any project-side
+patches. (See the experiment commit on this branch with the verbatim re-degit for confirmation.)
 
 ## Plumbing I left intact (verify on arrival)
 

@@ -7,8 +7,8 @@ This branch is a self-contained reproduction of the bug filed as
 required for the non-`--full-app` path.
 
 It exists so anyone reading the issues can clone, run a single command, and observe the
-`0 passing (0ms)` symptom on a clean app — and inspect the verified two-line bridge fix in
-diff form.
+`0 passing (0ms)` symptom on a clean app — and inspect the verified upstream fix in diff form
+against a working repro.
 
 ## TL;DR — reproduce the bug
 
@@ -98,7 +98,7 @@ Detailed write-ups in `docs/superpowers/specs/`:
 
 - **[`2026-04-30-fullapp-no-bundle-exec-design.md`](./docs/superpowers/specs/2026-04-30-fullapp-no-bundle-exec-design.md)** — the original brainstorm + design for the repro setup. Captures the version pins, the symlink+canonicalize side-bug, why `meteor.testModule` was originally removed.
 - **[`2026-04-30-fullapp-no-bundle-exec-findings.md`](./docs/superpowers/specs/2026-04-30-fullapp-no-bundle-exec-findings.md)** — interim findings from the long bisect. Includes the configuration matrix, the dead-ends I went down on the diagnosis (some claims here were later corrected — see the handoff for the canonical reading), and "things I got wrong" so a future reader doesn't repeat them.
-- **[`2026-05-01-fullapp-no-bundle-exec-handoff.md`](./docs/superpowers/specs/2026-05-01-fullapp-no-bundle-exec-handoff.md)** — the canonical handoff. Status as of 2026-05-06, the verified two-line fix, the testModule.server experiment that ruled out a per-project workaround, and the PR #14396 review notes (the two follow-up fixes that need to land before merge).
+- **[`2026-05-01-fullapp-no-bundle-exec-handoff.md`](./docs/superpowers/specs/2026-05-01-fullapp-no-bundle-exec-handoff.md)** — the canonical handoff. Status as of 2026-05-06, the verified upstream fix in PR #14396, the testModule.server experiment that ruled out a per-project workaround, and the two follow-up review fixes that landed on the PR before it was ready for merge.
 
 For taking the fixes back to a meteor source checkout (i.e. updating PR #14396), see
 [`.context/drafts/14396-pr-fixes-handoff.md`](./.context/drafts/14396-pr-fixes-handoff.md) —
@@ -110,7 +110,7 @@ a self-contained spec with the exact diffs ready to apply.
 |---|---|---|
 | [meteor#14371](https://github.com/meteor/meteor/issues/14371) | Eager-loader: `forEach(ctx)` → `await Promise.all(... .map(ctx))` in `@meteorjs/rspack/lib/test.js`. | Open. The branch ships this as a `patch-package` patch. Required for non-`--full-app`. |
 | [meteor#14392](https://github.com/meteor/meteor/issues/14392) | Original "boot.js's `vm.Script`" framing of the bug — the actual bug is at the rspack ↔ reify bridge, not the boot.js layer. | **Closed** as misframed; superseded by #14395. |
-| [meteor#14395](https://github.com/meteor/meteor/issues/14395) | Bridge file doesn't await the bundle's Promise. The corrected diagnosis with the verified two-line fix. | Open. |
+| [meteor#14395](https://github.com/meteor/meteor/issues/14395) | Bridge file doesn't await the bundle's Promise. The corrected diagnosis. | Open. Fix is in PR #14396 (below). |
 | [meteor#14396](https://github.com/meteor/meteor/pull/14396) | Per's enhancement of the bridge-file fix — detect-async-bundle gate so non-TLA bundles aren't penalised. | Open. PR head `588e3c92` includes both follow-up fixes (correct rspack signal in `detectAsyncBundle`, `looksLikeRspackBundle` guard in the loop). Verbatim PR source verified to produce 2 passing on this branch's slow-TLA repro under both modes — see commit [`4f05e9c`](../../commit/4f05e9c). |
 
 ## Branch hygiene notes
