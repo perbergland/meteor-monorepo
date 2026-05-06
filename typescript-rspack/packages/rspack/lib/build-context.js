@@ -111,41 +111,28 @@ export function ensureRspackBuildContextExists() {
  * Returns true if the rspack-emitted bundle at the given absolute path contains
  * async modules (top-level await in its transitive dep graph).
  *
- * Detection signal: rspack injects the runtime helper
- * `__webpack_handle_async_dependencies__` into a chunk's preamble only when
- * that chunk contains at least one async module. Reading the first 64 KB is
- * sufficient since the helper sits near the top of the chunk. If the file
- * doesn't exist yet (first run, before rspack has emitted anything) or read
- * fails, we conservatively report false; a subsequent post-compile refresh
- * will re-evaluate.
+ * Detection signals: rspack only emits the async-module wrapper helper
+ * `__webpack_require__.a = (module, body, hasAwait) => { ... }` and the
+ * per-async-import await helper `__rspack_load_async_deps([...])` when at
+ * least one module in the chunk is async. Either signal is sufficient.
+ *
+ * The helpers live in the runtime-helpers section near the END of the bundle
+ * (after all module bodies), so we read the whole file rather than a head
+ * window. Bundles are typically a few hundred KB; reading the full content
+ * is acceptable. If the file doesn't exist yet (first run, before rspack has
+ * emitted anything) or read fails, we conservatively report false; a
+ * subsequent post-compile refresh will re-evaluate.
  *
  * @param {string} absBundlePath - Absolute path to the emitted bundle file.
  * @returns {boolean} True if the bundle contains async modules.
  */
 function detectAsyncBundle(absBundlePath) {
-  let fd;
   try {
-    fd = fs.openSync(absBundlePath, 'r');
-    // Read enough to reach the runtime helpers section. The whole bundle is
-    // typically a few hundred KB; the helpers live near the end. Reading the
-    // full file once is fine for a one-shot detection.
-    const stat = fs.fstatSync(fd);
-    const buf = Buffer.alloc(Math.max(stat.size, 1));
-    const bytes = fs.readSync(fd, buf, 0, buf.length, 0);
-    const text = buf.toString('utf8', 0, bytes);
-    // rspack emits `__webpack_require__.a = (module, body, hasAwait) => { ... }`
-    // (the async-module wrapper helper) only when at least one module in the
-    // graph used `__webpack_require__.a` to wrap itself — i.e. when the bundle
-    // has TLA somewhere. The string `__webpack_require__.a` appears literally
-    // in the bundle as part of that definition.
+    const text = fs.readFileSync(absBundlePath, 'utf8');
     return text.includes('__webpack_require__.a ') ||
            text.includes('__rspack_load_async_deps');
   } catch (err) {
     return false;
-  } finally {
-    if (fd !== undefined) {
-      try { fs.closeSync(fd); } catch (_) {}
-    }
   }
 }
 
@@ -255,13 +242,13 @@ export function ensureModuleFilesExist() {
         return;
       }
 
-      // 3. If it doesn't already start with the new defaultContent, overwrite it
-      // EXPERIMENT (#14395 PR fix): skip output-role files whose existing content
-      // is substantially larger than the default placeholder — that's rspack's
-      // actual bundle output, which we must not overwrite when this function is
-      // re-invoked from the onCompileServer hook for bridge-refresh purposes.
-      const looksLikeRspackBundle = existing.length > defaultContent.length * 2 &&
-        filename.endsWith('-rspack.js');
+      // 3. If it doesn't already start with the new defaultContent, overwrite it.
+      //    Skip output-role bundle files (`*-rspack.js`) once rspack has populated
+      //    them with the real bundle — re-invocation from the post-compile hook
+      //    would otherwise clobber the emitted bundle with the placeholder.
+      //    See meteor#14395.
+      const looksLikeRspackBundle = filename.endsWith('-rspack.js') &&
+        existing.length > defaultContent.length * 2;
       if (!looksLikeRspackBundle && !existing.includes(defaultContent)) {
         try {
           fs.writeFileSync(filePath, defaultContent, 'utf8');
