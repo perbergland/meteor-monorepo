@@ -52,7 +52,7 @@ async TLA in a real app (`await mongoClient.connect()`, CSFLE handshake, dd-trac
 | [`typescript-rspack/server/x.app-tests.ts`, `y.app-tests.ts`](./typescript-rspack/server/) | `--full-app` mode test files. Both transitively reach `async-tla.ts` via `wrapper.ts`. |
 | [`typescript-rspack/server/x.tests.ts`, `y.tests.ts`](./typescript-rspack/server/) | Same shape, eager-mode test files. Confirms the bug is not specific to `--full-app`. |
 | [`typescript-rspack/patches/@meteorjs+rspack+2.0.1.patch`](./typescript-rspack/patches/) | The meteor#14371 eager-loader patch (`forEach(ctx)` → `await Promise.all(... .map(ctx))`), applied via patch-package + a `postinstall` hook so `npm install` reapplies it. Required for non-`--full-app` mode. |
-| [`typescript-rspack/packages/rspack/`](./typescript-rspack/packages/rspack/) | A `degit` of `ref-app/meteor#fix/14395-rspack-bridge-awaits-bundle-promise/packages/rspack`, with two follow-up fixes applied on top of PR meteor#14396 — see the [docs/superpowers/specs/2026-05-01-fullapp-no-bundle-exec-handoff.md](./docs/superpowers/specs/2026-05-01-fullapp-no-bundle-exec-handoff.md) for the diff and rationale. With the local copy in place and both fixes applied, the reproduction passes 2/2. |
+| [`typescript-rspack/packages/rspack/`](./typescript-rspack/packages/rspack/) | A `degit` of `ref-app/meteor#fix/14395-rspack-bridge-awaits-bundle-promise/packages/rspack` (PR meteor#14396, head `588e3c92`). Verbatim, no local edits — the two follow-up fixes documented during this work are already integrated upstream. With this local copy in place plus the meteor#14371 patch via patch-package, the reproduction passes 2/2 under both modes. |
 | [`typescript-rspack/rspack.config.js`](./typescript-rspack/rspack.config.js) | Verbatim from the private repo (`ref-app/refapp@chore/bgc-rspack@e4ead81fca`). Provides `resolve.symlinks: false`, swc `jsc.baseUrl`/`jsc.paths` clearing, and the server-only externals function for `node:` prefix stripping etc. The first two are required for the symlinked `shared/` setup to build at all (see commit [`305c3ef`](../../commit/305c3ef) → [`2d0730a`](../../commit/2d0730a) for the failure-then-fix demo). The externals are inert here because none of the externalised packages are installed; they're kept verbatim so the file matches the private repo. |
 | [`docs/superpowers/specs/`](./docs/superpowers/specs/) | The full design / findings / handoff documents — see "Documentation" below. |
 | [`.context/drafts/`](./.context/drafts/) | Working drafts of the GitHub issue + PR comment bodies; gitignored. Includes the active handoff at [`14396-pr-fixes-handoff.md`](./.context/drafts/14396-pr-fixes-handoff.md) for taking the two PR fixes back to a meteor source checkout. |
@@ -71,14 +71,13 @@ The branch's commits are designed to be bisectable so anyone reading along can `
    `meteor test`: **0 passing** still. The bundle's `module.exports` is now a Promise (good),
    but the bridge file (`_build/test/server-meteor.js`) doesn't await it (the bug this branch
    primarily reproduces).
-3. **`7042c19`** (`chore: degit PR #14396 + two fixes; verified 2 passing on slow-TLA repro`) —
-   meteor#14371 patch on, PR #14396's bridge-fix scheme on, plus two follow-up fixes to PR
-   #14396 detailed in the handoff.
+3. **`4f05e9c`** (`chore: re-degit PR #14396 verbatim — both fixes now in PR head`) —
+   meteor#14371 patch on, verbatim PR meteor#14396 source.
    `meteor test`: **2 passing** under both `meteor test` and `meteor test --full-app`.
    `[diag] async-tla.ts settled` actually fires; `AFTER-IMPORT - TOP ≈ 500ms`.
 
-The current tip ([`7042c19`](../../commit/7042c19)) is the "fixed" state. Roll back to either
-of the earlier two to see the bug.
+The current tip ([`4f05e9c`](../../commit/4f05e9c)) is the "fixed" state, with the PR's source
+verbatim. Roll back to either of the earlier two to see the bug.
 
 ## How to make the bug reproduce or stop reproducing
 
@@ -112,7 +111,7 @@ a self-contained spec with the exact diffs ready to apply.
 | [meteor#14371](https://github.com/meteor/meteor/issues/14371) | Eager-loader: `forEach(ctx)` → `await Promise.all(... .map(ctx))` in `@meteorjs/rspack/lib/test.js`. | Open. The branch ships this as a `patch-package` patch. Required for non-`--full-app`. |
 | [meteor#14392](https://github.com/meteor/meteor/issues/14392) | Original "boot.js's `vm.Script`" framing of the bug — the actual bug is at the rspack ↔ reify bridge, not the boot.js layer. | **Closed** as misframed; superseded by #14395. |
 | [meteor#14395](https://github.com/meteor/meteor/issues/14395) | Bridge file doesn't await the bundle's Promise. The corrected diagnosis with the verified two-line fix. | Open. |
-| [meteor#14396](https://github.com/meteor/meteor/pull/14396) | Per's enhancement of the bridge-file fix — detect-async-bundle gate so non-TLA bundles aren't penalised. | Open as draft. Has two bugs documented in [`.context/drafts/14396-pr-fixes-handoff.md`](./.context/drafts/14396-pr-fixes-handoff.md); branch tip [`7042c19`](../../commit/7042c19) has both fixes applied locally and verified. |
+| [meteor#14396](https://github.com/meteor/meteor/pull/14396) | Per's enhancement of the bridge-file fix — detect-async-bundle gate so non-TLA bundles aren't penalised. | Open. PR head `588e3c92` includes both follow-up fixes (correct rspack signal in `detectAsyncBundle`, `looksLikeRspackBundle` guard in the loop). Verbatim PR source verified to produce 2 passing on this branch's slow-TLA repro under both modes — see commit [`4f05e9c`](../../commit/4f05e9c). |
 
 ## Branch hygiene notes
 
