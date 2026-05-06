@@ -196,6 +196,73 @@ eager test discovery or an explicit `testModule` entry. Fix B is the only fix.
 Files for the experiment are committed on the branch (see commit immediately preceding this
 handoff update); revert if not useful for the upstream PR.
 
+## Experiment 2026-05-06 — degitting PR #14396 into the app
+
+PR [meteor#14396](https://github.com/meteor/meteor/pull/14396) is Per's enhancement of the
+original Pattern G fix: rather than always using the TLA bridge form, it detects whether the
+rspack bundle is async and only swaps to the TLA bridge in that case.
+
+degit'd `ref-app/meteor#fix/14395-rspack-bridge-awaits-bundle-promise/packages/rspack` into the
+app's `typescript-rspack/packages/rspack/` so meteor uses the local copy. Two issues surfaced:
+
+### 1. `detectAsyncBundle` looks for the wrong signal
+
+The PR detects async bundles via:
+```js
+buf.toString('utf8', 0, bytes).includes('__webpack_handle_async_dependencies__');
+```
+
+That string doesn't appear in `@meteorjs/rspack`'s output. rspack uses different runtime helper
+names. In our test bundle, the relevant strings are `__webpack_require__.a` (the async-module
+wrapper definition) and `__rspack_load_async_deps` (the per-async-import await helper). The PR's
+signal returns 0 occurrences; the substitute returns 1+ (definition) and 8 (call sites).
+
+Fix: replace the signal string with `__webpack_require__.a ` (with trailing space, to match the
+helper definition `__webpack_require__.a = ...`) or `__rspack_load_async_deps`. Also bump the
+read buffer to the whole file size — the helper definition lives near the *end* of the bundle,
+not in the first 64 KB.
+
+### 2. The post-compile hook's `ensureModuleFilesExist()` overwrites rspack's bundle output
+
+`ensureModuleFilesExist()` writes ALL module files including `*-rspack.js` (the OUTPUT-role files
+that rspack itself populates). On the FIRST call (before rspack runs), this creates the
+placeholder `/* Code generated */`. After rspack writes the real bundle, the post-compile hook
+calls `ensureModuleFilesExist()` AGAIN. The `if (!existing.includes(defaultContent))` check sees
+that the real bundle doesn't contain the literal placeholder string and **overwrites the bundle
+with the placeholder**. The bridge then imports a placeholder file, the program crashes with
+`ReferenceError: undefined<...repeated 36000 times> is not defined` somewhere in meteor's eager
+load loop.
+
+Fix: in the loop, skip files whose existing content is substantially larger than the default and
+whose name ends in `-rspack.js` (rspack already wrote real output, don't clobber it):
+
+```js
+const looksLikeRspackBundle = existing.length > defaultContent.length * 2 &&
+  filename.endsWith('-rspack.js');
+if (!looksLikeRspackBundle && !existing.includes(defaultContent)) {
+  fs.writeFileSync(filePath, defaultContent, 'utf8');
+}
+```
+
+### Verified
+
+With both fixes applied to the local `packages/rspack/`, the slow-TLA repro passes 2/2 in both
+modes:
+
+```
+[diag] async-tla.ts settled @ <ts+500ms>
+[diag] x.tests.ts top-level @ <ts+500ms>
+[diag] y.tests.ts top-level @ <ts+500ms>
+
+  smoke x  ✔
+  smoke y  ✔
+
+ 2 passing
+```
+
+Both fixes are tiny — one literal-string change and one length-guard. They should land on the PR
+before merge.
+
 ## Plumbing I left intact (verify on arrival)
 
 - `~/.meteor/packages/core-runtime/.../os/load-js-image.js` — restored to original (verified

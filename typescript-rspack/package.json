@@ -42,9 +42,6 @@
       "client": "client/main.tsx",
       "server": "server/main.ts"
     },
-    "testModule": {
-      "server": "server/testmain.ts"
-    },
     "modern": true
   }
 }
