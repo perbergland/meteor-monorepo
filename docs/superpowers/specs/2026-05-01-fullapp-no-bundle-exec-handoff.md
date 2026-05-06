@@ -42,10 +42,10 @@ git checkout chore/fullapp-repro
 cd typescript-rspack
 npm install
 
-meteor test --full-app --once --driver-package meteortesting:mocha --port 3015
+meteor test --full-app --once --driver-package meteortesting:mocha
 # 0 passing (0ms)
 
-meteor test --once --driver-package meteortesting:mocha --port 3015
+meteor test --once --driver-package meteortesting:mocha
 # 0 passing (0ms)
 ```
 

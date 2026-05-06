@@ -16,7 +16,7 @@ against a working repro.
 git clone -b chore/fullapp-repro git@github.com:perbergland/meteor-monorepo.git
 cd meteor-monorepo/typescript-rspack
 npm install
-meteor test --once --driver-package meteortesting:mocha --port 3015
+meteor test --once --driver-package meteortesting:mocha
 ```
 
 Expect:
